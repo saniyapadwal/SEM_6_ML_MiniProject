@@ -2,6 +2,9 @@ import polars as pl
 
 df = pl.read_csv("./wild_life_all_species.csv")
 
+# Total uniue cities count
+print(df['city'].unique().count())
+
 # Drop rows where 'city' is null
 df = df.drop_nulls(subset=['city'])
 
