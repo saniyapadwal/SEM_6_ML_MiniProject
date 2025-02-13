@@ -1,6 +1,6 @@
 import polars as pl
 
-df = pl.read_csv("./wild_life_all_species.csv")
+df = pl.read_csv("CompleteDataset/updated_wild_life_all_species.csv")
 
 # Total uniue cities count
 print(df['city'].unique().count())
