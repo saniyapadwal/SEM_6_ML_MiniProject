@@ -1,21 +1,26 @@
 import polars as pl
 import requests
 from pathlib import Path
+from datetime import datetime, timedelta
 
 # Define input and output directories
-input_folder = Path("cities")  # Source folder for CSV files
+input_folder = Path("cities")  # Folder containing original CSV files
+api_data_folder = Path("api_fetched_data")  # Folder to store API responses
 output_folder = Path("updated_cities")  # Folder to save updated CSVs
-output_folder.mkdir(exist_ok=True)  # Create folder if not exists
+
+# Create folders if they don't exist
+api_data_folder.mkdir(exist_ok=True)
+output_folder.mkdir(exist_ok=True)
 
 # Visual Crossing API Key
 API_KEY = "U7CZCVG2NYX6JDE6GM988A8VS"
+MAX_DAYS = [10, 5, 1]  # List of decreasing day limits
 
 
-# Function to fetch weather data from the API
 def fetch_weather(latitude, longitude, start_date, end_date):
-    """Fetch weather data from Visual Crossing API for given coordinates and dates."""
+    """Fetch weather data from Visual Crossing API for given coordinates and date range."""
     url = f"https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/{latitude},{longitude}/{start_date}/{end_date}?unitGroup=metric&key={API_KEY}&contentType=json"
-    
+
     try:
         response = requests.get(url)
         if response.status_code == 200:
@@ -26,6 +31,20 @@ def fetch_weather(latitude, longitude, start_date, end_date):
     except Exception as e:
         print(f"❌ Error fetching weather data: {e}")
         return None
+
+
+def split_date_range(start_date, end_date, max_days):
+    """Split the date range into smaller chunks based on API limits."""
+    start = datetime.strptime(start_date, "%Y-%m-%d")
+    end = datetime.strptime(end_date, "%Y-%m-%d")
+
+    date_ranges = []
+    while start <= end:
+        chunk_end = min(start + timedelta(days=max_days - 1), end)
+        date_ranges.append((start.strftime("%Y-%m-%d"), chunk_end.strftime("%Y-%m-%d")))
+        start = chunk_end + timedelta(days=1)
+
+    return date_ranges
 
 
 # Process each CSV file
@@ -44,40 +63,69 @@ for file in input_folder.glob("*.csv"):
     # Convert observed_date column to string format (YYYY-MM-DD)
     df = df.with_columns(df["observed_date"].cast(pl.Utf8))
 
-    # Initialize list to store weather data
-    weather_data = []
+    # Get latitude, longitude, and date range
+    latitude = df["latitude"][0]  # Assuming all rows have the same latitude & longitude
+    longitude = df["longitude"][0]
+    start_date = df["observed_date"].min()
+    end_date = df["observed_date"].max()
 
-    # Fetch weather data for each row
-    for row in df.iter_rows(named=True):
-        latitude = row["latitude"]
-        longitude = row["longitude"]
-        date = row["observed_date"]
+    print(f"🌍 Fetching weather for ({latitude}, {longitude}) from {start_date} to {end_date}")
 
-        # Fetch weather data
-        weather_info = fetch_weather(latitude, longitude, date, date)
+    all_weather_data = []
+    current_start = start_date
 
-        if weather_info and "days" in weather_info:
-            # Extract relevant weather details (e.g., temperature, humidity)
-            day_data = weather_info["days"][0]
-            row.update({
-                "temp": day_data.get("temp", None),
-                "humidity": day_data.get("humidity", None),
-                "windspeed": day_data.get("windspeed", None),
-                "dew": day_data.get("dew", None),
-                "precip": day_data.get("precip", None),
-                "snow": day_data.get("snow", None),
-            })
-        else:
-            row.update({"temp": None, "humidity": None, "windspeed": None, "dew": None, "precip": None, "snow": None})
+    while current_start <= end_date:
+        success = False
 
-        weather_data.append(row)
+        # Try different query sizes from MAX_DAYS list
+        for days in MAX_DAYS:
+            current_end = (datetime.strptime(current_start, "%Y-%m-%d") + timedelta(days=days - 1)).strftime("%Y-%m-%d")
+            if current_end > end_date:
+                current_end = end_date
 
-    # Create a new DataFrame with added weather columns
-    new_df = pl.DataFrame(weather_data)
+            print(f"🔹 Trying {days} days: {current_start} to {current_end}")
 
-    # Save updated CSV file to output directory
+            weather_info = fetch_weather(latitude, longitude, current_start, current_end)
+
+            if weather_info and "days" in weather_info:
+                # Extract relevant weather details
+                for day in weather_info["days"]:
+                    all_weather_data.append({
+                        "observed_date": day["datetime"],
+                        "temp": day.get("temp"),
+                        "humidity": day.get("humidity"),
+                        "windspeed": day.get("windspeed"),
+                        "dew": day.get("dew"),
+                        "precip": day.get("precip"),
+                        "snow": day.get("snow"),
+                    })
+
+                current_start = (datetime.strptime(current_end, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+                success = True
+                break  # Exit the loop when a successful fetch occurs
+
+        if not success:
+            print(f"❌ Unable to fetch data for {current_start}. Skipping...")
+            break
+
+    if not all_weather_data:
+        print(f"❌ No weather data available for {file.name}, skipping update.")
+        continue
+
+    # Convert API response to DataFrame
+    weather_df = pl.DataFrame(all_weather_data)
+
+    # Save API fetched data separately
+    api_file = api_data_folder / file.name
+    weather_df.write_csv(api_file)
+    print(f"✅ Saved API data: {api_file}")
+
+    # Merge with original data based on observed_date
+    updated_df = df.join(weather_df, on="observed_date", how="left")
+
+    # Save the final updated CSV
     output_file = output_folder / file.name
-    new_df.write_csv(output_file)
-    print(f"✅ Saved: {output_file}")
+    updated_df.write_csv(output_file)
+    print(f"✅ Updated and saved: {output_file}")
 
 print("🎉 Processing complete!")
