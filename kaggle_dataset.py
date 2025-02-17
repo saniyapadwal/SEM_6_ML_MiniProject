@@ -16,7 +16,7 @@ output_folder = "updated_weather_data_cities"
 os.makedirs(output_folder, exist_ok=True)
 
 # Specify the file to start processing from
-start_from_file = "Bhojpur.csv"  # Change this to the desired file
+start_from_file = "166_Dharwad.csv"  # Change this to the desired file
 
 # Function to fetch weather data with automatic retry on rate limit error
 def fetch_weather_data(lat, lon, start_date, end_date):
@@ -92,7 +92,16 @@ for file in files:
     # Merge based on observed_date and fetched weather date
     merged_df = df.merge(weather_df, left_on="observed_date", right_on="date", how="left").drop(columns=["date"])
 
+    # Modify filename by inserting "updated_" after the first underscore (_)
+    parts = file.split("_", 1)  # Split into at most 2 parts
+    if len(parts) == 2:
+        new_filename = f"{parts[0]}_updated_{parts[1]}"  # Insert "updated_" after first "_"
+    else:
+        new_filename = f"updated_{file}"  # If no "_", just add "updated_" at the start
+    
+    
     # Save new CSV file
-    output_file_path = os.path.join(output_folder, f"updated_{file}")
+    output_file_path = os.path.join(output_folder, new_filename)
     merged_df.to_csv(output_file_path, index=False)
+    
     print(f"✅ Updated file saved: {output_file_path}")

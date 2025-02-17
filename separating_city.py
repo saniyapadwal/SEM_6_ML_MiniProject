@@ -29,5 +29,6 @@ for city in df['city'].unique():
     city_lower = city.lower()  # Convert city name to lowercase
     city_df = df.filter(pl.col("city") == city)
     city_df.write_csv(f"{output_dir}/{city_lower}.csv")
-
+    
+print(city)
 print("City-wise CSV files saved successfully!")
