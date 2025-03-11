@@ -16,7 +16,7 @@ output_folder = "updated_weather_data_cities"
 os.makedirs(output_folder, exist_ok=True)
 
 # Specify the file to start processing from
-start_from_file = "166_Dharwad.csv"  # Change this to the desired file
+start_from_file = "313_Kasaragod.csv"  # Change this to the desired file
 
 # Function to fetch weather data with automatic retry on rate limit error
 def fetch_weather_data(lat, lon, start_date, end_date):

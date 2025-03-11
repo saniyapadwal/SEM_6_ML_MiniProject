@@ -1,0 +1,23 @@
+Histogram of Latitude and Longitude
+Box Plot for Outlier Detection
+Density Plot (KDE Plot) of Latitude and Longitude
+Scatter Plot (Geolocation Distribution)
+Heatmap (Density of Observations on Map)
+Pair Plot (Feature Relationships)
+Correlation Matrix (Heatmap of Features)
+
+
+Latitude (37.7749) → Specifies how far north/south from the equator.
+Longitude (-122.4194) → Specifies how far east/west from the Prime Meridian.
+
+
+Longitude Range:
+Western Hemisphere: 0° to -180° (e.g., USA, South America)
+Eastern Hemisphere: 0° to +180° (e.g., Europe, Asia, Australia)
+
+alpha controls the transparency of the points in the scatter plot.
+Range: 0 (completely transparent) to 1 (fully visible).
+
+
+ If latitude decreases as temperature increases, the regression line will slope downward (negative correlation).
+This would mean hotter temperatures at lower latitudes (closer to the equator) and cooler temperatures at higher latitudes.
